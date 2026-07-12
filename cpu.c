@@ -1,3 +1,5 @@
+#include "cpu.h"
+#include "util.h"
 #include <bits/posix2_lim.h>
 #include <limits.h>
 #include <pthread.h>
@@ -8,113 +10,103 @@
 
 #define NB_CPU_PROPERTIES 2
 
-char **get_tokens(char *line) {
-  int nb_tokens = 20;
-  char **tokens = malloc(sizeof(*tokens) * nb_tokens);
-  if (tokens == NULL) {
-    perror("malloc");
-    return NULL;
+enum {
+  USER = 1,
+  NICE = 2,
+  SYSTEM = 3,
+  IDLE = 4,
+  IOWAIT = 5,
+  IRQ = 6,
+  SOFTIRQ = 7,
+  STEAL = 8
+};
+
+static int get_current_cpu_ticks(unsigned long long *active,
+                                 unsigned long long *idle) {
+  FILE *cpu_stat = fopen("/proc/stat", "r");
+  char line[LINE_MAX];
+  if (cpu_stat == NULL) {
+    perror("fopen");
+    return 0;
   }
-  int len = strlen(line);
-  int count = 0;
-  int inside_word = 0;
-  for (int i = 0; i < len; i++) {
-    if (line[i] != ' ' && !inside_word) {
-      if (count >= nb_tokens - 1) {
-        nb_tokens *= 2;
-        char **tmp = realloc(tokens, sizeof(*tokens) * nb_tokens);
-        if (tmp == NULL) {
-          perror("realloc");
-          free(tokens);
-          return NULL;
-        }
-        tokens = tmp;
-      }
-      tokens[count++] = &line[i];
-      inside_word = 1;
-    } else if (line[i] == ' ' && inside_word) {
-      line[i] = '\0';
-      inside_word = 0;
+  if (fgets(line, sizeof(line), cpu_stat) != NULL) {
+    char **tokens = get_tokens(line);
+    if (tokens == NULL || tokens[8] == NULL) {
+      fprintf(stderr, "get_tokens\n");
+      return -1;
     }
+    *active = strtoll(tokens[USER], NULL, 0) + strtoll(tokens[NICE], NULL, 0) +
+              strtoll(tokens[SYSTEM], NULL, 0) + strtoll(tokens[IRQ], NULL, 0) +
+              strtoll(tokens[STEAL], NULL, 0) +
+              strtoll(tokens[SOFTIRQ], NULL, 0);
+    *idle = strtoll(tokens[IDLE], NULL, 0) + strtoll(tokens[IOWAIT], NULL, 0);
+    free(tokens);
+    fclose(cpu_stat);
+    return 1;
   }
-  tokens[count] = NULL;
-  return tokens;
+  return 0;
 }
 
 void *cpu_usage(void *usage) {
   unsigned long long active_t1, active_t2, idle_t1, idle_t2, active, idle;
-  unsigned long long *usage_ptr = (unsigned long long *)usage;
+  _Atomic unsigned long long *usage_ptr = usage;
   char **tokens;
   char line[LINE_MAX];
-  FILE *cpu_stat;
 
+  if (!get_current_cpu_ticks(&active_t1, &idle_t1))
+    return NULL;
   while (1) {
-    cpu_stat = fopen("/proc/stat", "r");
-    if (cpu_stat == NULL) {
-      perror("fopen");
-      return NULL;
-    }
-    if (fgets(line, sizeof(line), cpu_stat) != NULL) {
-      tokens = get_tokens(line);
-      if (tokens == NULL) {
-        fprintf(stderr, "get_tokens\n");
-        return NULL;
-      }
-      active_t1 = atol(tokens[1]) + atol(tokens[2]) + atol(tokens[3]) +
-                  atol(tokens[6]) + atol(tokens[8]);
-      idle_t1 = atol(tokens[4]) + atol(tokens[5]);
-      free(tokens);
-      fclose(cpu_stat);
-    }
-
     sleep(1);
-
-    cpu_stat = fopen("/proc/stat", "r");
-    if (cpu_stat == NULL) {
-      perror("fopen");
-    }
-    if (fgets(line, sizeof(line), cpu_stat) != NULL) {
-      tokens = get_tokens(line);
-      if (tokens == NULL) {
-        fprintf(stderr, "get_tokens\n");
-      }
-      active_t2 = atol(tokens[1]) + atol(tokens[2]) + atol(tokens[3]) +
-                  atol(tokens[6]) + atol(tokens[8]);
-      idle_t2 = atol(tokens[4]) + atol(tokens[5]);
+    if (get_current_cpu_ticks(&active_t2, &idle_t2)) {
       active = active_t2 - active_t1;
       idle = idle_t2 - idle_t1;
-      *usage_ptr = (active * 100) / (active + idle);
-      free(tokens);
-      fclose(cpu_stat);
+      if (active != 0) {
+        *usage_ptr = (active * 100) / (active + idle);
+      } else {
+        *usage_ptr = 0;
+      }
+      active_t1 = active_t2;
+      idle_t1 = idle_t2;
+    } else {
+      return NULL;
     }
   }
   return NULL;
 }
 
-void cpu_info() {
-  FILE *cpu_info = fopen("/proc/cpuinfo", "r");
-  if (cpu_info == NULL) {
-    perror("fopen");
+void cpu_info(Cpu *cpu) {
+  FILE *file = fopen("/proc/cpuinfo", "r");
+  if (file == NULL) {
+    perror("fopen /proc/cpuinfo");
+    return;
   }
+
   char line[LINE_MAX];
-  int property_count = 0;
-  char *properties[] = {"model name", "cpu cores"};
-  char *saveptr;
-
-  while (fgets(line, sizeof(line), cpu_info) != NULL &&
-         property_count < NB_CPU_PROPERTIES) {
-    char *key = strtok_r(line, ":", &saveptr);
-    char *value = strtok_r(NULL, ":", &saveptr);
-    if (key == NULL || value == NULL) {
-      perror("strtok_r");
+  int fields_found = 0;
+  while (fgets(line, sizeof(line), file) != NULL &&
+         fields_found < NB_CPU_PROPERTIES) {
+    char *colon = strchr(line, ':');
+    if (colon == NULL) {
+      continue;
     }
-    for (int i = 0; i < NB_CPU_PROPERTIES; i++) {
-      if (strncmp(properties[i], key, strlen(properties[i])) == 0) {
-        printf("%s : %s", properties[i], value);
-        property_count++;
-      }
+
+    if (cpu->model_name[0] == '\0' && strstr(line, "model name") != NULL) {
+      char *val = colon + 1;
+
+      // trim
+      while (*val == ' ' || *val == '\t')
+        val++;
+      val[strcspn(val, "\n")] = '\0';
+
+      strncpy(cpu->model_name, val, sizeof(cpu->model_name) - 1);
+      fields_found++;
+    }
+
+    else if (cpu->nb_cores == 0 && strstr(line, "cpu cores") != NULL) {
+      cpu->nb_cores = atoi(colon + 1);
+      fields_found++;
     }
   }
 
-  fclose(cpu_info);
+  fclose(file);
 }

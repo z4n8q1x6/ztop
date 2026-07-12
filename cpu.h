@@ -1,7 +1,13 @@
 #ifndef CPU_H
 #define CPU_H
 
-void cpu_info();
+typedef struct {
+  char model_name[128];
+  int nb_cores;
+  _Atomic long long usage;
+} Cpu;
+
+void cpu_info(Cpu *cpu);
 void *cpu_usage(void *usage);
 
 #endif // CPU_H
