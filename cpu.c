@@ -110,3 +110,24 @@ void cpu_info(Cpu *cpu) {
 
   fclose(file);
 }
+
+void display_cpu(Cpu *cpu) {
+  printf("\033[34m");
+  printf("Cpu Model : %s\n", cpu->model_name);
+  printf("Cpu Cores : %d\n", cpu->nb_cores);
+  printf("\033[0m");
+  if (cpu->usage <= 33) {
+    printf("\033[32m"
+           "Cpu Usage : %llu%%\n",
+           cpu->usage);
+  } else if (cpu->usage > 33 && cpu->usage < 67) {
+    printf("\033[33m"
+           "Cpu Usage : %llu%%\n",
+           cpu->usage);
+  } else {
+    printf("\033[31m"
+           "Cpu Usage : %llu%%\n",
+           cpu->usage);
+  }
+  printf("\033[0m");
+}

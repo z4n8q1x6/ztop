@@ -9,5 +9,6 @@ typedef struct {
 
 void cpu_info(Cpu *cpu);
 void *cpu_usage(void *usage);
+void display_cpu(Cpu *cpu);
 
 #endif // CPU_H
