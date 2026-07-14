@@ -1,7 +1,6 @@
 #include "cpu.h"
 #include "terminal.h"
 #include "util.h"
-#include <bits/posix2_lim.h>
 #include <bits/time.h>
 #include <limits.h>
 #include <poll.h>
@@ -34,9 +33,9 @@ int main() {
   unsigned long long remaining;
 
   Cpu cpu = {.usage = 0, .nb_cores = 0, .model_name = {0}};
-  cpu_info(&cpu);
+  init_cpu_info(&cpu);
   pthread_t cpu_thread;
-  if (pthread_create(&cpu_thread, NULL, cpu_usage, &cpu.usage) == -1) {
+  if (pthread_create(&cpu_thread, NULL, cpu_usage_thread, &cpu.usage) == -1) {
     perror("pthread_create");
     return 1;
   }
@@ -63,9 +62,3 @@ int main() {
   }
   return 0;
 }
-
-// Ram: (number + percentage)
-// * L’espace total du disque principal ; -> memtotal
-// * L’espace disponible(avaiablable) ; -> memAvailable
-// * L’espace disponible(free); -> memFree
-// * utilisation du disque. memtotal - avaialable

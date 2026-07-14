@@ -1,6 +1,5 @@
 #include "cpu.h"
 #include "util.h"
-#include <bits/posix2_lim.h>
 #include <limits.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -47,7 +46,7 @@ static int get_current_cpu_ticks(unsigned long long *active,
   return 0;
 }
 
-void *cpu_usage(void *usage) {
+void *cpu_usage_thread(void *usage) {
   unsigned long long active_t1, active_t2, idle_t1, idle_t2, active, idle;
   _Atomic unsigned long long *usage_ptr = usage;
   char **tokens;
@@ -74,23 +73,24 @@ void *cpu_usage(void *usage) {
   return NULL;
 }
 
-void cpu_info(Cpu *cpu) {
-  FILE *file = fopen("/proc/cpuinfo", "r");
-  if (file == NULL) {
+int init_cpu_info(Cpu *cpu) {
+  FILE *cpuinfo = fopen("/proc/cpuinfo", "r");
+  if (cpuinfo == NULL) {
     perror("fopen /proc/cpuinfo");
-    return;
+    return 0;
   }
 
   char line[LINE_MAX];
   int fields_found = 0;
-  while (fgets(line, sizeof(line), file) != NULL &&
-         fields_found < NB_CPU_PROPERTIES) {
+  char *cpu_infos[] = {"model name", "cpu cores"};
+  int n = 2;
+  while (fgets(line, sizeof(line), cpuinfo) != NULL && fields_found < n) {
     char *colon = strchr(line, ':');
     if (colon == NULL) {
       continue;
     }
 
-    if (cpu->model_name[0] == '\0' && strstr(line, "model name") != NULL) {
+    if (cpu->model_name[0] == '\0' && strstr(line, cpu_infos[0]) != NULL) {
       char *val = colon + 1;
 
       // trim
@@ -100,15 +100,14 @@ void cpu_info(Cpu *cpu) {
 
       strncpy(cpu->model_name, val, sizeof(cpu->model_name) - 1);
       fields_found++;
-    }
-
-    else if (cpu->nb_cores == 0 && strstr(line, "cpu cores") != NULL) {
+    } else if (cpu->nb_cores == 0 && strstr(line, cpu_infos[1]) != NULL) {
       cpu->nb_cores = atoi(colon + 1);
       fields_found++;
     }
   }
 
-  fclose(file);
+  return 1;
+  fclose(cpuinfo);
 }
 
 void display_cpu(Cpu *cpu) {
@@ -130,4 +129,5 @@ void display_cpu(Cpu *cpu) {
            cpu->usage);
   }
   printf("\033[0m");
+  draw_usage_bar(cpu->usage);
 }

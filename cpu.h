@@ -4,11 +4,11 @@
 typedef struct {
   char model_name[128];
   int nb_cores;
-  _Atomic long long usage;
+  _Atomic unsigned long long usage;
 } Cpu;
 
-void cpu_info(Cpu *cpu);
-void *cpu_usage(void *usage);
+int init_cpu_info(Cpu *cpu);
+void *cpu_usage_thread(void *usage);
 void display_cpu(Cpu *cpu);
 
 #endif // CPU_H

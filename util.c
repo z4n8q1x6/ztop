@@ -43,8 +43,6 @@ void draw_usage_bar(int usage) {
   int remaining = 100 - usage;
   if (usage > 100)
     usage = 100;
-  if (usage < 0)
-    remaining = 100;
 
   printf("[");
   for (int i = 0; i < usage; i++) {

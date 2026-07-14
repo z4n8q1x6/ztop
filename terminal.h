@@ -1,5 +1,5 @@
-#ifndef BUFFER_H
-#define BUFFER_H
+#ifndef TERMINAL_H
+#define TERMINAL_H
 
 #include <termios.h>
 
@@ -7,4 +7,4 @@ void setup_terminal();
 void handle_input();
 void reset_terminal();
 
-#endif // BUFFER_H
+#endif // TERMINAL_H

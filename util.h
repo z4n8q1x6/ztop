@@ -4,4 +4,4 @@
 char **get_tokens(char *line);
 void draw_usage_bar(int usage);
 
-#endif
+#endif // UTIL_H
