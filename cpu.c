@@ -111,6 +111,7 @@ int init_cpu_info(Cpu *cpu) {
 }
 
 void display_cpu(Cpu *cpu) {
+  printf("--------------------- CPU ---------------------\n");
   printf("\033[34m");
   printf("Cpu Model : %s\n", cpu->model_name);
   printf("Cpu Cores : %d\n", cpu->nb_cores);

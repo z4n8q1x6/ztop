@@ -1,4 +1,5 @@
 #include "cpu.h"
+#include "ram.h"
 #include "terminal.h"
 #include "util.h"
 #include <bits/time.h>
@@ -36,7 +37,13 @@ int main() {
   init_cpu_info(&cpu);
   pthread_t cpu_thread;
   if (pthread_create(&cpu_thread, NULL, cpu_usage_thread, &cpu.usage) == -1) {
-    perror("pthread_create");
+    perror("cpu pthread_create");
+    return 1;
+  }
+  _Atomic Ram ram;
+  pthread_t ram_thread;
+  if (pthread_create(&ram_thread, NULL, ram_info_thread, &ram) == -1) {
+    perror("ram pthread_create");
     return 1;
   }
 
@@ -57,7 +64,9 @@ int main() {
     clock_gettime(CLOCK_MONOTONIC, &first);
     printf("\033[2J\033[H");
     display_cpu(&cpu);
-    draw_usage_bar(cpu.usage);
+    Ram snap = ram;
+    display_ram(&snap);
+    // need to add ram usage bar and init_ram function for the first ram read
     clock_gettime(CLOCK_MONOTONIC, &last);
   }
   return 0;

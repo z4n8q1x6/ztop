@@ -11,4 +11,7 @@ typedef struct {
   size_t used;
 } Ram;
 
+void *ram_info_thread(void *arg);
+void display_ram(Ram *snap);
+
 #endif // RAM_H
