@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-void setup_terminal() {
+void init_terminal() {
   struct termios t;
   if (tcgetattr(STDIN_FILENO, &t) == -1) {
     perror("tcgetattr");

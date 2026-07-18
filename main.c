@@ -20,7 +20,7 @@ void handle_sigint(int sig) {
 
 int main() {
   signal(SIGINT, handle_sigint);
-  setup_terminal();
+  init_terminal();
   struct pollfd fds[1];
   fds[0].events = POLLIN;
   fds[0].fd = STDIN_FILENO;
@@ -34,15 +34,19 @@ int main() {
   unsigned long long remaining;
 
   Cpu cpu = {.usage = 0, .nb_cores = 0, .model_name = {0}};
-  init_cpu_info(&cpu);
-  pthread_t cpu_thread;
-  if (pthread_create(&cpu_thread, NULL, cpu_usage_thread, &cpu.usage) == -1) {
+  init_cpu(&cpu);
+  pthread_t cpu_pthread;
+  if (pthread_create(&cpu_pthread, NULL, cpu_thread, &cpu.usage) == -1) {
     perror("cpu pthread_create");
     return 1;
   }
+
   _Atomic Ram ram;
-  pthread_t ram_thread;
-  if (pthread_create(&ram_thread, NULL, ram_info_thread, &ram) == -1) {
+  Ram snap;
+  init_ram(&snap);
+  ram = snap;
+  pthread_t ram_pthread;
+  if (pthread_create(&ram_pthread, NULL, ram_thread, &ram) == -1) {
     perror("ram pthread_create");
     return 1;
   }
@@ -63,10 +67,9 @@ int main() {
     }
     clock_gettime(CLOCK_MONOTONIC, &first);
     printf("\033[2J\033[H");
-    display_cpu(&cpu);
+    print_cpu(&cpu);
     Ram snap = ram;
-    display_ram(&snap);
-    // need to add ram usage bar and init_ram function for the first ram read
+    print_ram(&snap);
     clock_gettime(CLOCK_MONOTONIC, &last);
   }
   return 0;

@@ -1,3 +1,4 @@
+#include "util.h"
 #include <bits/posix2_lim.h>
 #include <limits.h>
 #include <pthread.h>
@@ -39,7 +40,7 @@ char **get_tokens(char *line) {
   return tokens;
 }
 
-void draw_usage_bar(int usage) {
+void print_usage_bar(int usage) {
   int remaining = 100 - usage;
   if (usage > 100)
     usage = 100;

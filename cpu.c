@@ -7,8 +7,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#define NB_CPU_PROPERTIES 2
-
 enum {
   USER = 1,
   NICE = 2,
@@ -46,7 +44,7 @@ static int get_current_cpu_ticks(unsigned long long *active,
   return 0;
 }
 
-void *cpu_usage_thread(void *usage) {
+void *cpu_thread(void *usage) {
   unsigned long long active_t1, active_t2, idle_t1, idle_t2, active, idle;
   _Atomic unsigned long long *usage_ptr = usage;
   char **tokens;
@@ -73,7 +71,7 @@ void *cpu_usage_thread(void *usage) {
   return NULL;
 }
 
-int init_cpu_info(Cpu *cpu) {
+int init_cpu(Cpu *cpu) {
   FILE *cpuinfo = fopen("/proc/cpuinfo", "r");
   if (cpuinfo == NULL) {
     perror("fopen /proc/cpuinfo");
@@ -110,7 +108,7 @@ int init_cpu_info(Cpu *cpu) {
   fclose(cpuinfo);
 }
 
-void display_cpu(Cpu *cpu) {
+void print_cpu(Cpu *cpu) {
   printf("--------------------- CPU ---------------------\n");
   printf("\033[34m");
   printf("Cpu Model : %s\n", cpu->model_name);
@@ -130,5 +128,5 @@ void display_cpu(Cpu *cpu) {
            cpu->usage);
   }
   printf("\033[0m");
-  draw_usage_bar(cpu->usage);
+  print_usage_bar(cpu->usage);
 }

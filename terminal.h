@@ -3,7 +3,7 @@
 
 #include <termios.h>
 
-void setup_terminal();
+void init_terminal();
 void handle_input();
 void reset_terminal();
 

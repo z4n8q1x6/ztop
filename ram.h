@@ -9,9 +9,11 @@ typedef struct {
   size_t free;
   size_t cached;
   size_t used;
+  int usage;
 } Ram;
 
-void *ram_info_thread(void *arg);
-void display_ram(Ram *snap);
+int init_ram(Ram *ram);
+void *ram_thread(void *arg);
+void print_ram(Ram *snap);
 
 #endif // RAM_H

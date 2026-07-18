@@ -7,8 +7,8 @@ typedef struct {
   _Atomic unsigned long long usage;
 } Cpu;
 
-int init_cpu_info(Cpu *cpu);
-void *cpu_usage_thread(void *usage);
-void display_cpu(Cpu *cpu);
+int init_cpu(Cpu *cpu);
+void *cpu_thread(void *usage);
+void print_cpu(Cpu *cpu);
 
 #endif // CPU_H

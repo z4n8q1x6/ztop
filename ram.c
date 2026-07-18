@@ -9,66 +9,81 @@
 #include <unistd.h>
 
 enum { TOTAL, FREE, AVAILABLE, CACHED };
+static const char ram_infos[4][13] = {"MemTotal", "MemFree", "MemAvailable",
+                                      "Cached"};
+static const size_t n_ram_infos = sizeof(ram_infos) / sizeof(ram_infos[0]);
+static int read_ram(Ram *ram);
 
-void *ram_info_thread(void *arg) {
-  Ram ram;
+int init_ram(Ram *ram) {
+  if (!read_ram(ram))
+    return 0;
+  return 1;
+}
+
+static int read_ram(Ram *ram) {
   char line[LINE_MAX];
-  size_t n = 4;
-  char ram_infos[n][13];
   int fields_found = 0;
-  FILE *meminfo;
+  FILE *meminfo = fopen("/proc/meminfo", "r");
+  if (meminfo == NULL) {
+    perror("fopen");
+    return 0;
+  }
+  while (fgets(line, sizeof(line), meminfo) != NULL &&
+         fields_found < n_ram_infos) {
+    for (int i = 0; i < n_ram_infos; i++) {
+      if (strncmp(line, ram_infos[i], strlen(ram_infos[i])) == 0) { // check
+        char *colon = strchr(line, ':');
+        if (colon == NULL)
+          continue;
 
-  strcpy(ram_infos[TOTAL], "MemTotal");
-  strcpy(ram_infos[FREE], "MemFree");
-  strcpy(ram_infos[AVAILABLE], "MemAvailable");
-  strcpy(ram_infos[CACHED], "Cached");
-  while (1) {
-    meminfo = fopen("/proc/meminfo", "r");
-    if (meminfo == NULL) {
-      perror("fopen");
-      return NULL;
-    }
-    while (fgets(line, sizeof(line), meminfo) != NULL && fields_found < n) {
-      for (int i = 0; i < n; i++) {
-        if (strncmp(line, ram_infos[i], strlen(ram_infos[i])) == 0) {
-          char *colon = strchr(line, ':');
-          if (colon == NULL)
-            continue;
-
-          char *val = ++colon;
-          unsigned long long tmp = strtoull(val, NULL, 0);
-          switch (i) {
-          case TOTAL:
-            ram.total = tmp;
-            break;
-          case AVAILABLE:
-            ram.available = tmp;
-            break;
-          case FREE:
-            ram.free = tmp;
-            break;
-          case CACHED:
-            ram.cached = tmp;
-            break;
-          }
-          fields_found++;
+        char *val = ++colon;
+        unsigned long long tmp = strtoull(val, NULL, 0);
+        switch (i) {
+        case TOTAL:
+          ram->total = tmp;
+          break;
+        case AVAILABLE:
+          ram->available = tmp;
+          break;
+        case FREE:
+          ram->free = tmp;
+          break;
+        case CACHED:
+          ram->cached = tmp;
+          break;
         }
+        fields_found++;
       }
     }
-    ram.used = ram.total - ram.available;
-    *(_Atomic Ram *)arg = ram;
-    fields_found = 0;
-    fclose(meminfo);
+  }
+  ram->used = ram->total - ram->available;
+  if (ram->total != 0)
+    ram->usage = (ram->used * 100) / ram->total;
+  else
+    ram->usage = 0;
+  fclose(meminfo);
+  return 1;
+}
+
+void *ram_thread(void *arg) {
+  Ram ram;
+
+  while (1) {
+    if (read_ram(&ram)) {
+      *(_Atomic Ram *)arg = ram;
+    }
     sleep(1);
   }
   return NULL;
 }
 
-void display_ram(Ram *snap) {
+void print_ram(Ram *snap) {
   printf("--------------------- RAM ---------------------\n");
   printf("Total: %zu\n", snap->total);
   printf("Available: %zu\n", snap->available);
   printf("Free : %zu\n", snap->free);
   printf("Cached: %zu\n", snap->cached);
   printf("Used: %zu\n", snap->used);
+  printf("Usage: %d%%\n", snap->usage);
+  print_usage_bar(snap->usage);
 }
