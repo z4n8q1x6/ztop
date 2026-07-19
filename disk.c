@@ -1,36 +1,53 @@
+#include "disk.h"
+#include "util.h"
+#include <math.h>
 #include <stdio.h>
 #include <sys/statvfs.h>
+#include <unistd.h>
 
-int main() {
-  // * L’espace total du disque principal ;
-  // * L’espace utilisé ;
-  // * L’espace disponible ;
-  // * Le pourcentage d’utilisation du disque.
-  struct statvfs buf;
-  statvfs("/", &buf);
-  unsigned long long free = buf.f_bfree * buf.f_bsize;
-  unsigned long long available = buf.f_bavail * buf.f_bsize;
-  unsigned long long priviligated = free - available;
-  // unpriviliged
-  unsigned long long total = (buf.f_blocks * buf.f_frsize);
-  unsigned long long used = total - available;
-  int usage = (used * 100 + total - 1) / total;
-  printf("Total memory: %llu\n", total);
-  printf("Available memory: %llu\n", available);
-  printf("Used memory: %llu\n", used);
-  printf("Usage: %d%%\n", usage);
-  // printf("Priviligated %llu\n", priviligated);
-  // printf("--------------\n");
-  // printf("Filesystem block size      : %lu\n", buf.f_bsize);
-  // printf("Fragment size              : %lu\n", buf.f_frsize);
-  // printf("Total blocks               : %lu\n", buf.f_blocks);
-  // printf("Free blocks                : %lu\n", buf.f_bfree);
-  // printf("Avaialable blocks (uu      : %lu\n", buf.f_bavail);
-  // printf("Total inodes               : %lu\n", buf.f_files);
-  // printf("Free inodes                : %lu\n", buf.f_ffree);
-  // printf("Free inodes (uu)           : %lu\n", buf.f_favail);
-  // printf("Filesystem ID              : %lu\n", buf.f_fsid);
-  // printf("Mount flags                : %lx\n", buf.f_flag);
-  // printf("Maximum filename length    : %lu\n", buf.f_namemax);
+static int read_disk(Disk *disk);
+
+int init_disk(_Atomic Disk *disk) {
+  Disk disk_snap;
+  if (read_disk(&disk_snap)) {
+    *disk = disk_snap;
+    return 1;
+  }
   return 0;
+}
+
+static int read_disk(Disk *disk) {
+  struct statvfs buf;
+  if (statvfs("/", &buf) == -1)
+    return 0;
+  disk->free = buf.f_bfree * buf.f_bsize;
+  disk->available = buf.f_bavail * buf.f_bsize;
+  disk->privileged = disk->free - disk->available;
+  disk->total = (buf.f_blocks * buf.f_frsize);
+
+  disk->used = disk->total - disk->available;
+  disk->usage = (disk->used * 100) / disk->total;
+  return 1;
+}
+
+void *disk_thread(void *arg) {
+  Disk disk;
+  while (1) {
+    if (read_disk(&disk)) {
+      *(Disk *)arg = disk;
+    }
+    sleep(5);
+  }
+  return NULL;
+}
+
+void print_disk(Disk *disk) {
+  printf("--------------------- DISK ---------------------\n");
+  printf("Total memory: %.0lfG\n", round(BYTE_TO_GIB((double)disk->total)));
+  printf("Avaialable memory: %.0lfG\n",
+         round(BYTE_TO_GIB((double)disk->available)));
+  printf("Free memory: %.0lfG\n", round(BYTE_TO_GIB((double)disk->free)));
+  printf("Used memory: %.0lfG\n", round(BYTE_TO_GIB((double)disk->used)));
+  printf("Usage: %d%%\n", disk->usage);
+  print_usage_bar(disk->usage);
 }

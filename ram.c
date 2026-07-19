@@ -14,10 +14,13 @@ static const char ram_infos[4][13] = {"MemTotal", "MemFree", "MemAvailable",
 static const size_t n_ram_infos = sizeof(ram_infos) / sizeof(ram_infos[0]);
 static int read_ram(Ram *ram);
 
-int init_ram(Ram *ram) {
-  if (!read_ram(ram))
-    return 0;
-  return 1;
+int init_ram(_Atomic Ram *ram) {
+  Ram ram_snap;
+  if (read_ram(&ram_snap)) {
+    *ram = ram_snap;
+    return 1;
+  }
+  return 0;
 }
 
 static int read_ram(Ram *ram) {

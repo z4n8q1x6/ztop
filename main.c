@@ -1,7 +1,7 @@
 #include "cpu.h"
+#include "disk.h"
 #include "ram.h"
 #include "terminal.h"
-#include "util.h"
 #include <bits/time.h>
 #include <limits.h>
 #include <poll.h>
@@ -42,11 +42,17 @@ int main() {
   }
 
   _Atomic Ram ram;
-  Ram snap;
-  init_ram(&snap);
-  ram = snap;
+  init_ram(&ram);
   pthread_t ram_pthread;
   if (pthread_create(&ram_pthread, NULL, ram_thread, &ram) == -1) {
+    perror("ram pthread_create");
+    return 1;
+  }
+
+  _Atomic Disk disk;
+  init_disk(&disk);
+  pthread_t disk_pthread;
+  if (pthread_create(&disk_pthread, NULL, disk_thread, &disk) == -1) {
     perror("ram pthread_create");
     return 1;
   }
@@ -68,9 +74,13 @@ int main() {
     clock_gettime(CLOCK_MONOTONIC, &first);
     printf("\033[2J\033[H");
     print_cpu(&cpu);
-    Ram snap = ram;
-    print_ram(&snap);
+    Ram ram_snap = ram;
+    print_ram(&ram_snap);
+    Disk disk_snap = disk;
+    print_disk(&disk_snap);
     clock_gettime(CLOCK_MONOTONIC, &last);
   }
   return 0;
 }
+
+// TODO: Refactor main, implement compact, improve ui

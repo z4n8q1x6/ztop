@@ -30,7 +30,7 @@ static int get_current_cpu_ticks(unsigned long long *active,
     char **tokens = get_tokens(line);
     if (tokens == NULL || tokens[8] == NULL) {
       fprintf(stderr, "get_tokens\n");
-      return -1;
+      return 0;
     }
     *active = strtoll(tokens[USER], NULL, 0) + strtoll(tokens[NICE], NULL, 0) +
               strtoll(tokens[SYSTEM], NULL, 0) + strtoll(tokens[IRQ], NULL, 0) +
@@ -91,7 +91,6 @@ int init_cpu(Cpu *cpu) {
     if (cpu->model_name[0] == '\0' && strstr(line, cpu_infos[0]) != NULL) {
       char *val = colon + 1;
 
-      // trim
       while (*val == ' ' || *val == '\t')
         val++;
       val[strcspn(val, "\n")] = '\0';
